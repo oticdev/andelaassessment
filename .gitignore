@@ -1,0 +1,16 @@
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+.DS_Store
+.env
+github-actions-deployer-key.json
