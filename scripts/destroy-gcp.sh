@@ -5,9 +5,11 @@ PROJECT_ID="${PROJECT_ID:-andela-assessment-494309}"
 REGION="${REGION:-us-central1}"
 STATE_BUCKET="${TERRAFORM_STATE_BUCKET:-${PROJECT_ID}-terraform-state}"
 SERVICE_ACCOUNT_ID="${SERVICE_ACCOUNT_ID:-github-actions-deployer}"
+ARTIFACT_REPOSITORY="${ARTIFACT_REPOSITORY:-fastapi-services}"
 DELETE_PROJECT=false
 DELETE_STATE_BUCKET=false
 DELETE_SERVICE_ACCOUNT=false
+DELETE_ARTIFACT_REPOSITORY=false
 
 usage() {
   cat <<EOF
@@ -20,6 +22,7 @@ Options:
   --region REGION             Google Cloud region. Default: ${REGION}
   --state-bucket BUCKET       Terraform state bucket. Default: ${STATE_BUCKET}
   --delete-state-bucket       Delete the Terraform state bucket after destroying resources.
+  --delete-artifact-repo      Delete the Artifact Registry Docker repository.
   --delete-service-account    Delete the GitHub Actions deployer service account.
   --delete-project            Delete the entire Google Cloud project after Terraform destroy.
   -h, --help                  Show this help text.
@@ -50,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       DELETE_STATE_BUCKET=true
       shift
       ;;
+    --delete-artifact-repo)
+      DELETE_ARTIFACT_REPOSITORY=true
+      shift
+      ;;
     --delete-service-account)
       DELETE_SERVICE_ACCOUNT=true
       shift
@@ -57,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     --delete-project)
       DELETE_PROJECT=true
       DELETE_STATE_BUCKET=true
+      DELETE_ARTIFACT_REPOSITORY=true
       shift
       ;;
     -h|--help)
@@ -95,7 +103,8 @@ for environment in dev staging prod; do
       -auto-approve \
       -var="project_id=${PROJECT_ID}" \
       -var="region=${REGION}" \
-      -var="environment=${environment}"
+      -var="environment=${environment}" \
+      -var="image_name=${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/andelaassessment-${environment}:destroy"
   )
 done
 
@@ -104,6 +113,14 @@ if [[ "${DELETE_SERVICE_ACCOUNT}" == "true" ]]; then
   echo "Deleting service account ${SERVICE_ACCOUNT_EMAIL}..."
   gcloud iam service-accounts delete "${SERVICE_ACCOUNT_EMAIL}" \
     --project="${PROJECT_ID}" \
+    --quiet || true
+fi
+
+if [[ "${DELETE_ARTIFACT_REPOSITORY}" == "true" ]]; then
+  echo "Deleting Artifact Registry repository ${ARTIFACT_REPOSITORY}..."
+  gcloud artifacts repositories delete "${ARTIFACT_REPOSITORY}" \
+    --project="${PROJECT_ID}" \
+    --location="${REGION}" \
     --quiet || true
 fi
 

@@ -10,5 +10,5 @@ output "service_name" {
 
 output "image_name" {
   description = "Container image deployed to Cloud Run."
-  value       = local.image_name
+  value       = var.image_name
 }

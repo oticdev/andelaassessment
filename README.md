@@ -34,16 +34,17 @@ Terraform state is stored in a GCS bucket with separate prefixes for each enviro
 Set these repository secrets before relying on GitHub Actions deployments:
 
 - `GCP_PROJECT_ID`: Google Cloud project ID, for example `andela-assessment-494309`
-- `GCP_SA_KEY`: JSON key for a deployment service account
 - `TERRAFORM_STATE_BUCKET`: globally unique GCS bucket name for Terraform state
+- `GCP_SERVICE_ACCOUNT`: deployment service account email
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: Workload Identity Federation provider resource name
 
-You can create the deployer service account and local key with:
+Bootstrap Google Cloud, Artifact Registry, Terraform state, and keyless GitHub authentication with:
 
 ```bash
-scripts/create-gcp-deployer.sh andela-assessment-494309
+scripts/bootstrap-gcp.sh
 ```
 
-Use the contents of `github-actions-deployer-key.json` as `GCP_SA_KEY`.
+The script prints the exact GitHub secret values to set. It uses Workload Identity Federation, so there is no service account JSON key to create, store, rotate, or leak.
 
 ## Destroy Resources
 
@@ -59,6 +60,12 @@ Destroy Terraform-managed resources and delete the Terraform state bucket:
 scripts/destroy-gcp.sh --delete-state-bucket
 ```
 
+Destroy Terraform-managed resources and delete the Artifact Registry repository:
+
+```bash
+scripts/destroy-gcp.sh --delete-artifact-repo
+```
+
 Destroy everything and delete the entire Google Cloud project:
 
 ```bash
@@ -72,8 +79,9 @@ The script requires typing the project ID before it proceeds.
 Prerequisites:
 
 - Google Cloud project with billing enabled
-- `gcloud` CLI authenticated with permissions to enable services, create Artifact Registry repos, submit Cloud Build jobs, and deploy Cloud Run
+- `gcloud` CLI authenticated with permissions to deploy Cloud Run
 - Terraform installed
+- A pushed container image in Artifact Registry
 
 ```bash
 gcloud auth login
@@ -86,7 +94,8 @@ terraform init \
   -backend-config="prefix=terraform/state/dev"
 terraform apply \
   -var="project_id=andela-assessment-494309" \
-  -var="environment=dev"
+  -var="environment=dev" \
+  -var="image_name=us-central1-docker.pkg.dev/andela-assessment-494309/fastapi-services/andelaassessment-dev:TAG"
 ```
 
 Terraform outputs the Cloud Run service URL when deployment completes.

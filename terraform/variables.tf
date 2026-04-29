@@ -37,8 +37,7 @@ variable "allow_unauthenticated" {
   default     = true
 }
 
-variable "image_tag" {
-  description = "Container image tag to deploy. Defaults to the selected environment."
+variable "image_name" {
+  description = "Fully qualified container image name to deploy."
   type        = string
-  default     = ""
 }

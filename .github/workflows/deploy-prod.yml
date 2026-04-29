@@ -2,34 +2,50 @@ name: Deploy Prod
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Production environment confirmation.
+        required: true
+        type: choice
+        options:
+          - prod
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   deploy:
     name: Deploy prod to Cloud Run
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: prod
 
     env:
       PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       REGION: us-central1
+      ARTIFACT_REPOSITORY: fastapi-services
+      SERVICE_NAME: andelaassessment-prod
       TERRAFORM_STATE_BUCKET: ${{ secrets.TERRAFORM_STATE_BUCKET }}
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_region: us-central1
       TF_VAR_environment: prod
-      TF_VAR_image_tag: prod-${{ github.sha }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate production branch
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error::Production deploys must be dispatched from the main branch."
+            exit 1
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -39,13 +55,17 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Ensure Terraform state bucket
-        run: |
-          gcloud storage buckets describe "gs://${TERRAFORM_STATE_BUCKET}" >/dev/null 2>&1 || \
-            gcloud storage buckets create "gs://${TERRAFORM_STATE_BUCKET}" \
-              --project="${PROJECT_ID}" \
-              --location="${REGION}" \
-              --uniform-bucket-level-access
+      - name: Set image name
+        run: echo "TF_VAR_image_name=${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${SERVICE_NAME}:prod-${GITHUB_SHA}" >> "${GITHUB_ENV}"
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: docker build --tag "${TF_VAR_image_name}" .
+
+      - name: Push image
+        run: docker push "${TF_VAR_image_name}"
 
       - name: Terraform init
         working-directory: terraform
