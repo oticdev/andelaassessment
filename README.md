@@ -45,6 +45,28 @@ scripts/create-gcp-deployer.sh andela-assessment-494309
 
 Use the contents of `github-actions-deployer-key.json` as `GCP_SA_KEY`.
 
+## Destroy Resources
+
+Destroy all Terraform-managed environments:
+
+```bash
+scripts/destroy-gcp.sh
+```
+
+Destroy Terraform-managed resources and delete the Terraform state bucket:
+
+```bash
+scripts/destroy-gcp.sh --delete-state-bucket
+```
+
+Destroy everything and delete the entire Google Cloud project:
+
+```bash
+scripts/destroy-gcp.sh --delete-project
+```
+
+The script requires typing the project ID before it proceeds.
+
 ## Manual Terraform Deploy
 
 Prerequisites:
