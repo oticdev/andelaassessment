@@ -90,23 +90,28 @@ if ! confirm "This will destroy Terraform-managed Cloud Run and Artifact Registr
   exit 1
 fi
 
-for environment in dev staging prod; do
-  echo "Destroying ${environment}..."
-  (
-    cd terraform
-    terraform init \
-      -backend-config="bucket=${STATE_BUCKET}" \
-      -backend-config="prefix=terraform/state/${environment}" \
-      -reconfigure
+if gcloud storage buckets describe "gs://${STATE_BUCKET}" >/dev/null 2>&1; then
+  for environment in dev staging prod; do
+    echo "Destroying ${environment}..."
+    (
+      cd terraform
+      terraform init \
+        -backend-config="bucket=${STATE_BUCKET}" \
+        -backend-config="prefix=terraform/state/${environment}" \
+        -reconfigure
 
-    terraform destroy \
-      -auto-approve \
-      -var="project_id=${PROJECT_ID}" \
-      -var="region=${REGION}" \
-      -var="environment=${environment}" \
-      -var="image_name=${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/andelaassessment-${environment}:destroy"
-  )
-done
+      terraform destroy \
+        -auto-approve \
+        -var="project_id=${PROJECT_ID}" \
+        -var="region=${REGION}" \
+        -var="environment=${environment}" \
+        -var="image_name=${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/andelaassessment-${environment}:destroy"
+    )
+  done
+else
+  echo "Terraform state bucket gs://${STATE_BUCKET} does not exist."
+  echo "Skipping Terraform destroy because this project has not been bootstrapped/deployed with remote state."
+fi
 
 if [[ "${DELETE_SERVICE_ACCOUNT}" == "true" ]]; then
   SERVICE_ACCOUNT_EMAIL="${SERVICE_ACCOUNT_ID}@${PROJECT_ID}.iam.gserviceaccount.com"
